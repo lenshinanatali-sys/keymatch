@@ -29,6 +29,48 @@ document.addEventListener('keydown', (event) => {
 });
 ```
 
+### Keyboard layouts
+
+Letters and digits follow the active layout's ASCII character by default. On
+standard Dvorak, `Cmd+B` uses the key that types `b` rather than QWERTY's B position.
+Alt combinations, non-ASCII characters, and symbols on letter/digit keys retain
+physical-position matching. Other keys use their reported key names.
+
+Apps that detect macOS **Dvorak – QWERTY ⌘** should select physical matching
+for events with Command held, while leaving typing and Control shortcuts in
+character mode. Detection belongs to the app; a KeyboardEvent does not identify
+that input source.
+
+```typescript
+import { keymatch, normalizedEventKey, type KeymatchOptions } from 'keymatch';
+
+// Update this from the app's native layout service when the input source changes.
+let usesQwertyCommandKeys = false;
+
+function optionsForEvent(event: KeyboardEvent): KeymatchOptions {
+  return {
+    keyMode: usesQwertyCommandKeys && event.metaKey ? 'physical' : 'character',
+  };
+}
+
+function matchesBold(event: KeyboardEvent) {
+  return keymatch(event, 'CmdOrCtrl+B', optionsForEvent(event));
+}
+
+// Record with the same options used to match that event.
+function recordedKey(event: KeyboardEvent) {
+  return normalizedEventKey(event, optionsForEvent(event));
+}
+```
+
+Physical mode uses QWERTY positions for `KeyA`–`KeyZ` and `Digit0`–`Digit9`.
+It falls back to the reported key for other codes or when `code` is unavailable;
+it is not a general scan-code binding API. `normalizedEventKey` returns a lowercase
+base key (including aliases such as `space` and `up`), without modifiers.
+
+Previously saved physical-position bindings on non-QWERTY layouts may need to be
+recorded again when adopting character matching.
+
 ### Handling Single Letter Matches
 
 You can also handle single-letter matches that explicitly *don't* have modifiers. For example, this matches when "A" is pressed, but not when "Cmd+A" is pressed:
@@ -93,13 +135,14 @@ Any key that can be captured by a KeyboardEvent, including:
 
 ## API
 
-### `keymatch(event: KeyboardEvent, accelerator: string): boolean`
+### `keymatch(event: KeyboardEvent, accelerator: string, options?: KeymatchOptions): boolean`
 
 Checks if a KeyboardEvent matches the given accelerator string.
 
 **Parameters:**
 - `event` - The web-standard KeyboardEvent to test
 - `accelerator` - The Electron-style accelerator string
+- `options.keyMode` - `character` (default) or `physical`
 
 **Returns:**
 - `boolean` - True if the event matches the accelerator

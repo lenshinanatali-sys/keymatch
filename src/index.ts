@@ -1,2 +1,6 @@
 export { isMac } from './isMac.js';
-export { keymatch } from './keymatch.js';
+export {
+	type KeymatchOptions,
+	keymatch,
+	normalizedEventKey,
+} from './keymatch.js';

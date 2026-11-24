@@ -75,29 +75,21 @@ function normalizeKey(key: string): string {
 	return keyMap[normalized] || normalized;
 }
 
+export type KeymatchOptions = {
+	keyMode?: 'character' | 'physical';
+};
+
 /**
- * Derive a normalized base key from a KeyboardEvent.
- *
- * Letters and digits follow the character the active keyboard layout produces
- * (`key`), so on Dvorak, Colemak or AZERTY a shortcut spelled `CmdOrCtrl+B`
- * fires from the key that types "b", not from the key at QWERTY's B position.
- *
- * The physical key (`code`) is used only when:
- * - Alt is held (Option dead keys such as Option+O => 'ø'), so Alt shortcuts
- *   still match by key position on every layout.
- * - the key produces something other than an ASCII letter or digit on a letter
- *   or digit key: a non-ASCII letter (Cyrillic), punctuation (',' on Dvorak's
- *   KeyW, so Cmd+, there still matches `CmdOrCtrl+W`), or the symbol on a
- *   Shifted digit key ('@' on Digit2).
- *
- * Like native macOS apps, non-Latin layouts fall back to the key position.
- *
- * Anything else (Enter, arrows, Delete, `Dead`, `Unidentified`) goes to
- * `normalizeKey(key)` as before.
+ * Shares the matcher's base key with shortcut recorders. Character mode follows
+ * ASCII letters and digits; Alt, non-ASCII keys, and physical mode use the
+ * letter/digit key position. Other keys retain their reported names.
+ * The caller chooses the mode because events do not identify the OS layout.
  */
-function normalizedEventKey({ code, key, altKey }: KeyboardEvent): string {
-	if (!altKey && /^[a-zA-Z0-9]$/.test(key)) {
-		// e.g. 'B' on Dvorak => 'b'
+export function normalizedEventKey(
+	{ code, key, altKey }: KeyboardEvent,
+	{ keyMode = 'character' }: KeymatchOptions = {},
+): string {
+	if (keyMode === 'character' && !altKey && /^[a-zA-Z0-9]$/.test(key)) {
 		return key.toLowerCase();
 	}
 
@@ -127,11 +119,15 @@ function normalizedEventKey({ code, key, altKey }: KeyboardEvent): string {
  * }
  * ```
  */
-export function keymatch(event: KeyboardEvent, matchString: string): boolean {
+export function keymatch(
+	event: KeyboardEvent,
+	matchString: string,
+	options?: KeymatchOptions,
+): boolean {
 	const { ctrl, alt, shift, meta, key } = parseMatchString(matchString);
 
 	return (
-		normalizedEventKey(event) === key &&
+		normalizedEventKey(event, options) === key &&
 		event.ctrlKey === ctrl &&
 		event.altKey === alt &&
 		event.shiftKey === shift &&

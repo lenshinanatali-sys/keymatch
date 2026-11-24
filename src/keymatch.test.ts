@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
-import { keymatch } from './keymatch';
+import { keymatch, normalizedEventKey } from './index';
 
 // Helper function to create a mock KeyboardEvent
 function createKeyboardEvent(options: {
@@ -482,4 +482,70 @@ describe('keyboard-shortcut', () => {
 			expect(keymatch(eventLinux, 'Option+K')).toBe(false);
 		});
 	});
+});
+
+describe('matching mode', () => {
+	const physical = { keyMode: 'physical' } as const;
+
+	it('preserves hybrid Command positions without changing character mode', () => {
+		const event = createKeyboardEvent({
+			key: 'x',
+			code: 'KeyB',
+			metaKey: true,
+		});
+		expect(keymatch(event, 'Cmd+B', physical)).toBe(true);
+		expect(keymatch(event, 'Cmd+X', physical)).toBe(false);
+		expect(keymatch(event, 'Cmd+B')).toBe(false);
+		expect(keymatch(event, 'Cmd+X')).toBe(true);
+	});
+
+	it('keeps physical matching with Shift and rejects extra modifiers', () => {
+		const event = createKeyboardEvent({
+			key: 'X',
+			code: 'KeyB',
+			metaKey: true,
+			shiftKey: true,
+		});
+		expect(keymatch(event, 'Cmd+Shift+B', physical)).toBe(true);
+		expect(keymatch(event, 'Cmd+B', physical)).toBe(false);
+	});
+
+	it.each(['character', 'physical'] as const)(
+		'round-trips recorded keys in %s mode',
+		(keyMode) => {
+			const event = createKeyboardEvent({
+				key: 'b',
+				code: 'KeyN',
+				ctrlKey: true,
+			});
+			const options = { keyMode };
+			const key = normalizedEventKey(event, options);
+			expect(key).toBe(keyMode === 'character' ? 'b' : 'n');
+			expect(keymatch(event, `Ctrl+${key}`, options)).toBe(true);
+		},
+	);
+
+	it.each(['character', 'physical'] as const)(
+		'retains Alt and special-key fallbacks in %s mode',
+		(keyMode) => {
+			const options = { keyMode };
+			expect(
+				keymatch(
+					createKeyboardEvent({ key: 'ø', code: 'KeyO', altKey: true }),
+					'Alt+O',
+					options,
+				),
+			).toBe(true);
+			expect(
+				keymatch(
+					createKeyboardEvent({ key: 'ArrowUp', code: 'ArrowUp' }),
+					'Up',
+					options,
+				),
+			).toBe(true);
+			expect(keymatch(createKeyboardEvent({ key: 'b' }), 'B', options)).toBe(
+				true,
+			);
+		},
+	);
 });
